@@ -134,7 +134,8 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--muted)]/30">
+    <>
+      <div className="min-h-screen bg-[var(--muted)]/30">
       {/* Header */}
       <div className="bg-[var(--background)] border-b border-[var(--border)] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -629,5 +630,6 @@ export default function AdminDashboard() {
         </>
       )}
     </AnimatePresence>
+    </>
   );
 }
