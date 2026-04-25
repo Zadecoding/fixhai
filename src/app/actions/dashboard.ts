@@ -150,7 +150,7 @@ export async function getAdminDashboardData() {
       .order('created_at', { ascending: false }),
     admin
       .from('support_tickets')
-      .select('id, subject, description, priority, status, created_at, user_id, booking_id, user:users(name, email)')
+      .select('*, user:users(name, email)')
       .order('created_at', { ascending: false }),
     admin
       .from('users')
@@ -230,7 +230,7 @@ export async function getBookingStatus(id: string) {
 /** Submit a support ticket (any authenticated user). */
 export async function submitSupportTicket(data: {
   subject: string;
-  description: string;
+  description: string;   // maps to 'message' column in DB
   priority: 'normal' | 'high' | 'critical';
   booking_id?: string;
 }) {
@@ -243,17 +243,31 @@ export async function submitSupportTicket(data: {
   }
 
   const admin = getSupabaseAdmin();
-  const { error } = await admin.from('support_tickets').insert({
-    user_id: user.id,
-    subject: data.subject.trim(),
+
+  // Try inserting with 'description' first (post-migration), fall back to 'message'
+  let result = await admin.from('support_tickets').insert({
+    user_id:    user.id,
+    subject:    data.subject.trim(),
     description: data.description.trim(),
-    priority: data.priority ?? 'normal',
+    priority:   data.priority ?? 'normal',
     booking_id: data.booking_id || null,
-    status: 'open',
+    status:     'open',
   });
 
-  if (error) {
-    console.error('[submitSupportTicket] error:', error.message);
+  // If 'description' column doesn't exist yet, fall back to 'message' (pre-migration)
+  if (result.error?.message?.includes("description")) {
+    result = await admin.from('support_tickets').insert({
+      user_id:    user.id,
+      subject:    data.subject.trim(),
+      message:    data.description.trim(),
+      priority:   data.priority ?? 'normal',
+      booking_id: data.booking_id || null,
+      status:     'open',
+    });
+  }
+
+  if (result.error) {
+    console.error('[submitSupportTicket] error:', result.error.message);
     return { error: 'Failed to submit your ticket. Please try again.' };
   }
 

@@ -510,7 +510,7 @@ export default function AdminDashboard() {
                             {ticket.priority || "normal"}
                           </span>
                         </div>
-                        <div className="text-xs text-[var(--muted-foreground)] mb-2 max-w-2xl">{ticket.description}</div>
+                        <div className="text-xs text-[var(--muted-foreground)] mb-2 max-w-2xl">{ticket.description || ticket.message}</div>
                         <div className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider font-semibold">
                           {formatDate(ticket.created_at)} • {ticket.user?.name || ticket.user?.email || "Anonymous"}
                         </div>
