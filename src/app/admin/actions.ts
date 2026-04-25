@@ -138,13 +138,17 @@ export async function addTechnicianByAdmin(data: {
 
   const userId = authData.user.id;
 
-  // Step 3: Insert into public.users
-  const { error: userInsertError } = await admin.from('users').insert({
-    id: userId,
-    email: data.email.toLowerCase().trim(),
-    name: data.full_name.trim(),
-    role: 'technician',
-  });
+  // Step 3: Upsert into public.users
+  // (a DB trigger may have already inserted this row when the auth user was created)
+  const { error: userInsertError } = await admin.from('users').upsert(
+    {
+      id: userId,
+      email: data.email.toLowerCase().trim(),
+      name: data.full_name.trim(),
+      role: 'technician',
+    },
+    { onConflict: 'id' }
+  );
 
   if (userInsertError) {
     // Rollback: delete the auth user we just created
