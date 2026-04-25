@@ -230,7 +230,7 @@ export async function getBookingStatus(id: string) {
 /** Submit a support ticket (any authenticated user). */
 export async function submitSupportTicket(data: {
   subject: string;
-  description: string;   // maps to 'message' column in DB
+  description: string;
   priority: 'normal' | 'high' | 'critical';
   booking_id?: string;
 }) {
@@ -244,32 +244,29 @@ export async function submitSupportTicket(data: {
 
   const admin = getSupabaseAdmin();
 
-  // Try inserting with 'description' first (post-migration), fall back to 'message'
-  let result = await admin.from('support_tickets').insert({
-    user_id:    user.id,
-    subject:    data.subject.trim(),
-    description: data.description.trim(),
-    priority:   data.priority ?? 'normal',
-    booking_id: data.booking_id || null,
-    status:     'open',
-  });
+  // Build payload progressively — only include columns that exist in DB.
+  // The DB may have 'message' instead of 'description', and may be missing
+  // priority / status / booking_id until the migration is run.
+  const payloads = [
+    // Attempt 1: full schema (post-migration)
+    { user_id: user.id, subject: data.subject.trim(), description: data.description.trim(), priority: data.priority ?? 'normal', booking_id: data.booking_id || null, status: 'open' },
+    // Attempt 2: 'message' instead of 'description' (pre-migration column name)
+    { user_id: user.id, subject: data.subject.trim(), message: data.description.trim(), priority: data.priority ?? 'normal', booking_id: data.booking_id || null, status: 'open' },
+    // Attempt 3: no priority/booking_id/status
+    { user_id: user.id, subject: data.subject.trim(), description: data.description.trim() },
+    // Attempt 4: 'message' column, no extra columns
+    { user_id: user.id, subject: data.subject.trim(), message: data.description.trim() },
+  ];
 
-  // If 'description' column doesn't exist yet, fall back to 'message' (pre-migration)
-  if (result.error?.message?.includes("description")) {
-    result = await admin.from('support_tickets').insert({
-      user_id:    user.id,
-      subject:    data.subject.trim(),
-      message:    data.description.trim(),
-      priority:   data.priority ?? 'normal',
-      booking_id: data.booking_id || null,
-      status:     'open',
-    });
+  let lastError: string | null = null;
+  for (const payload of payloads) {
+    const { error } = await admin.from('support_tickets').insert(payload as Record<string, unknown>);
+    if (!error) return { success: true };
+    lastError = error.message;
+    // Only retry on schema-cache / column-not-found errors
+    if (!error.message.includes('column') && !error.message.includes('schema cache')) break;
   }
 
-  if (result.error) {
-    console.error('[submitSupportTicket] error:', result.error.message);
-    return { error: 'Failed to submit your ticket. Please try again.' };
-  }
-
-  return { success: true };
+  console.error('[submitSupportTicket] all attempts failed:', lastError);
+  return { error: 'Failed to submit your ticket. Please run the DB migration in supabase/fix_support_tickets_columns.sql and try again.' };
 }
