@@ -87,3 +87,103 @@ export async function verifyTechnician(technicianId: string, verify: boolean) {
   revalidatePath('/admin');
   return { success: true };
 }
+
+export async function addTechnicianByAdmin(data: {
+  full_name: string;
+  email: string;
+  phone: string;
+  category: string;
+  city: string;
+  pincode: string;
+  bio?: string;
+  experience_years?: number;
+}) {
+  const adminUser = await requireAdmin();
+  if (!adminUser) return { error: 'Unauthorized' };
+
+  // Basic validation
+  if (!data.full_name?.trim()) return { error: 'Full name is required.' };
+  if (!data.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
+    return { error: 'Valid email is required.' };
+  if (!data.phone?.trim()) return { error: 'Phone number is required.' };
+  if (!data.category?.trim()) return { error: 'Service category is required.' };
+  if (!data.city?.trim()) return { error: 'City is required.' };
+  if (!data.pincode?.trim() || !/^\d{6}$/.test(data.pincode))
+    return { error: 'Valid 6-digit pincode is required.' };
+
+  const admin = getAdminClient();
+
+  // Step 1: Check if a user with this email already exists
+  const { data: existingUsers } = await admin.auth.admin.listUsers();
+  const emailTaken = existingUsers?.users?.some(u => u.email === data.email.toLowerCase().trim());
+  if (emailTaken) return { error: 'A user with this email already exists.' };
+
+  // Step 2: Create auth user with a temporary password
+  // Technician must reset it on first login via "Forgot Password"
+  const tempPassword = `Fixhai@${Math.random().toString(36).slice(2, 10)}`;
+  const { data: authData, error: authError } = await admin.auth.admin.createUser({
+    email: data.email.toLowerCase().trim(),
+    password: tempPassword,
+    email_confirm: true, // skip email confirmation
+    user_metadata: {
+      full_name: data.full_name.trim(),
+      role: 'technician',
+    },
+  });
+
+  if (authError || !authData.user) {
+    console.error('[addTechnicianByAdmin] auth create error:', authError?.message);
+    return { error: authError?.message ?? 'Failed to create technician account.' };
+  }
+
+  const userId = authData.user.id;
+
+  // Step 3: Insert into public.users
+  const { error: userInsertError } = await admin.from('users').insert({
+    id: userId,
+    email: data.email.toLowerCase().trim(),
+    name: data.full_name.trim(),
+    role: 'technician',
+  });
+
+  if (userInsertError) {
+    // Rollback: delete the auth user we just created
+    await admin.auth.admin.deleteUser(userId);
+    console.error('[addTechnicianByAdmin] users insert error:', userInsertError.message);
+    return { error: 'Failed to create user profile. Please try again.' };
+  }
+
+  // Step 4: Insert technician profile — pre-verified since admin is adding directly
+  const { data: profile, error: profileError } = await admin
+    .from('technician_profiles')
+    .insert({
+      user_id: userId,
+      full_name: data.full_name.trim(),
+      phone: data.phone.trim(),
+      category: data.category,
+      city: data.city.trim(),
+      pincode: data.pincode.trim(),
+      bio: data.bio?.trim() ?? null,
+      experience_years: data.experience_years ?? 0,
+      verified: true,  // Admin-added technicians are pre-verified
+      active: true,
+      rating: 0,
+    })
+    .select('id')
+    .single();
+
+  if (profileError) {
+    // Rollback both
+    await admin.from('users').delete().eq('id', userId);
+    await admin.auth.admin.deleteUser(userId);
+    console.error('[addTechnicianByAdmin] profile insert error:', profileError.message);
+    return { error: 'Failed to create technician profile. Please try again.' };
+  }
+
+  revalidatePath('/admin');
+  return {
+    success: true,
+    technicianId: profile.id,
+    tempPassword, // Return so admin can share it with the technician
+  };
+}

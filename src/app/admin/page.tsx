@@ -1,19 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  CalendarDays,
-  CheckCircle2,
-  DollarSign,
-  Users,
-  Clock,
-  UserCheck,
-  ChevronRight,
-  Shield,
-  X,
-  Search,
-  Download,
+  CalendarDays, CheckCircle2, DollarSign, Users, Clock,
+  UserCheck, Shield, X, Search, Download, Plus, Copy, Eye, EyeOff,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +12,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import type { BookingStatus } from "@/types/database";
-import { getAdminTechnicians, verifyTechnician } from "./actions";
+import { getAdminTechnicians, verifyTechnician, addTechnicianByAdmin } from "./actions";
 import { getAdminDashboardData, getCategories } from "@/app/actions/dashboard";
 
 const adminTabs = ["Overview", "Bookings", "Technicians", "Categories", "Complaints"];
@@ -35,6 +26,11 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ full_name: "", email: "", phone: "", category: "", city: "", pincode: "", bio: "", experience_years: "" });
+  const [addLoading, setAddLoading] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<{ email: string; tempPassword: string } | null>(null);
+  const [showTempPass, setShowTempPass] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -82,6 +78,28 @@ export default function AdminDashboard() {
       );
     }
   };
+
+  const handleAddTechnician = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddLoading(true);
+    const res = await addTechnicianByAdmin({
+      ...addForm,
+      experience_years: addForm.experience_years ? Number(addForm.experience_years) : 0,
+    });
+    setAddLoading(false);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      setCreatedCreds({ email: addForm.email, tempPassword: res.tempPassword! });
+      // Refresh technicians list
+      const techRes = await getAdminTechnicians();
+      if (techRes.technicians) setTechnicians(techRes.technicians);
+      toast.success("Technician added successfully!");
+      setAddForm({ full_name: "", email: "", phone: "", category: "", city: "", pincode: "", bio: "", experience_years: "" });
+    }
+  };
+
+  const resetModal = () => { setShowAddModal(false); setCreatedCreds(null); setShowTempPass(false); };
 
   const exportCSV = () => {
     const headers = ["ID", "Service", "Issue", "Status", "City", "Fee", "Created At"];
@@ -328,8 +346,20 @@ export default function AdminDashboard() {
           {/* TECHNICIANS */}
           {activeTab === "Technicians" && (
             <div className="space-y-4">
+              {/* Header row with Add button */}
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[var(--muted-foreground)]">{technicians.length} technician{technicians.length !== 1 ? 's' : ''} registered</p>
+                <Button size="sm" variant="primary" onClick={() => setShowAddModal(true)}>
+                  <Plus className="w-4 h-4" /> Add Technician
+                </Button>
+              </div>
+
               {technicians.length === 0 ? (
-                <div className="text-center py-10 text-[var(--muted-foreground)]">No technicians registered yet.</div>
+                <div className="text-center py-16 text-[var(--muted-foreground)]">
+                  <UserCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">No technicians yet</p>
+                  <p className="text-sm mt-1">Click "Add Technician" to get started.</p>
+                </div>
               ) : (
                 technicians.map((tech) => (
                   <Card key={tech.id} className="p-5">
@@ -343,12 +373,12 @@ export default function AdminDashboard() {
                           {tech.verified ? (
                             <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">✓ Verified</span>
                           ) : (
-                            <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-semibold rounded-full">Pending Verification</span>
+                            <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-semibold rounded-full">Pending</span>
                           )}
                           {tech.active ? (
-                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">Online</span>
+                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">Active</span>
                           ) : (
-                            <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] text-xs font-semibold rounded-full">Offline</span>
+                            <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] text-xs font-semibold rounded-full">Inactive</span>
                           )}
                         </div>
                         <div className="text-sm text-[var(--muted-foreground)]">
@@ -464,5 +494,140 @@ export default function AdminDashboard() {
         </motion.div>
       </div>
     </div>
+
+    {/* ── Add Technician Modal ─────────────────────────────── */}
+    <AnimatePresence>
+      {showAddModal && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            onClick={resetModal}
+          />
+          {/* Panel */}
+          <motion.div
+            initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            className="fixed right-0 top-0 h-full w-full max-w-md bg-[var(--background)] shadow-2xl z-50 overflow-y-auto"
+          >
+            <div className="p-6">
+              {/* Modal header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-extrabold text-lg">Add Technician</h2>
+                  <p className="text-sm text-[var(--muted-foreground)]">Create a pre-verified technician account</p>
+                </div>
+                <button onClick={resetModal} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[var(--muted)] transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {createdCreds ? (
+                /* ── Success state: show credentials ── */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <span className="font-bold text-green-700 dark:text-green-400">Technician Created!</span>
+                    </div>
+                    <p className="text-sm text-[var(--muted-foreground)] mb-4">Share these login credentials with the technician. They can change their password after first login.</p>
+
+                    <div className="space-y-3">
+                      <div className="bg-[var(--background)] rounded-xl p-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-0.5">Email</p>
+                          <p className="text-sm font-mono font-medium">{createdCreds.email}</p>
+                        </div>
+                        <button onClick={() => { navigator.clipboard.writeText(createdCreds.email); toast.success('Email copied!'); }} className="p-2 hover:bg-[var(--muted)] rounded-lg transition-colors">
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="bg-[var(--background)] rounded-xl p-3 flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-0.5">Temporary Password</p>
+                          <p className="text-sm font-mono font-medium">{showTempPass ? createdCreds.tempPassword : '••••••••••••'}</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <button onClick={() => setShowTempPass(v => !v)} className="p-2 hover:bg-[var(--muted)] rounded-lg transition-colors">
+                            {showTempPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                          <button onClick={() => { navigator.clipboard.writeText(createdCreds.tempPassword); toast.success('Password copied!'); }} className="p-2 hover:bg-[var(--muted)] rounded-lg transition-colors">
+                            <Copy className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button variant="primary" className="w-full" onClick={() => { setCreatedCreds(null); }}>Add Another Technician</Button>
+                  <Button variant="outline" className="w-full" onClick={resetModal}>Done</Button>
+                </div>
+              ) : (
+                /* ── Add form ── */
+                <form onSubmit={handleAddTechnician} className="space-y-4">
+                  {([
+                    { label: 'Full Name', key: 'full_name', placeholder: 'e.g. Rahul Sharma', type: 'text', required: true },
+                    { label: 'Email Address', key: 'email', placeholder: 'rahul@example.com', type: 'email', required: true },
+                    { label: 'Phone Number', key: 'phone', placeholder: '+91 98765 43210', type: 'tel', required: true },
+                    { label: 'City', key: 'city', placeholder: 'e.g. Gurugram', type: 'text', required: true },
+                    { label: 'Pincode', key: 'pincode', placeholder: '6-digit pincode', type: 'text', required: true },
+                    { label: 'Years of Experience', key: 'experience_years', placeholder: 'e.g. 3', type: 'number', required: false },
+                  ] as const).map(({ label, key, placeholder, type, required }) => (
+                    <div key={key}>
+                      <label className="block text-sm font-semibold mb-1.5">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>
+                      <input
+                        type={type}
+                        value={addForm[key as keyof typeof addForm]}
+                        onChange={e => setAddForm(prev => ({ ...prev, [key]: e.target.value }))}
+                        placeholder={placeholder}
+                        required={required}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                      />
+                    </div>
+                  ))}
+
+                  {/* Category select */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5">Service Category<span className="text-red-500 ml-0.5">*</span></label>
+                    <select
+                      value={addForm.category}
+                      onChange={e => setAddForm(prev => ({ ...prev, category: e.target.value }))}
+                      required
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    >
+                      <option value="">Select a category</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Bio */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5">Bio <span className="text-[var(--muted-foreground)] font-normal">(optional)</span></label>
+                    <textarea
+                      value={addForm.bio}
+                      onChange={e => setAddForm(prev => ({ ...prev, bio: e.target.value }))}
+                      placeholder="Brief description of skills and experience..."
+                      rows={3}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    <Button type="button" variant="outline" className="flex-1" onClick={resetModal}>Cancel</Button>
+                    <Button type="submit" variant="primary" className="flex-1" disabled={addLoading}>
+                      {addLoading ? 'Creating...' : 'Create Technician'}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
