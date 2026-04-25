@@ -26,7 +26,7 @@ import type { BookingStatus } from "@/types/database";
 
 import { logout } from "@/app/auth/actions";
 
-const tabs = ["Bookings", "Payments", "Reviews", "Profile"];
+const tabs = ["Bookings", "Payments", "Reviews", "Support", "Profile"];
 
 export default function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState("Bookings");
@@ -248,6 +248,41 @@ export default function CustomerDashboard() {
                   description="After your booking is complete, you can leave a review for your technician."
                 />
               )}
+            </div>
+          )}
+
+          {activeTab === "Support" && (
+            <div className="space-y-4">
+              <Card className="p-8 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mx-auto mb-4">
+                  <HeadphonesIcon className="w-8 h-8 text-orange-500" />
+                </div>
+                <h2 className="text-xl font-extrabold mb-2">Need Help?</h2>
+                <p className="text-[var(--muted-foreground)] text-sm max-w-sm mx-auto mb-6">
+                  Raise a support ticket and our team will get back to you within 2 hours on business days.
+                </p>
+                <Link href="/support">
+                  <Button variant="primary" size="md">
+                    Raise a Support Ticket <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </Card>
+              <Card className="p-5">
+                <h3 className="font-bold mb-3 text-sm">Quick Help</h3>
+                <div className="space-y-1">
+                  {[
+                    ["Technician didn't arrive", "Raise a Critical ticket for a full refund."],
+                    ["Want to cancel a booking", "Cancel before technician assignment for a full refund."],
+                    ["Payment issue / double charged", "Raise a Critical ticket with your Booking ID."],
+                    ["Need an invoice", "Download from Bookings tab after job completion."],
+                  ].map(([q, a]) => (
+                    <div key={q} className="px-4 py-3 rounded-xl hover:bg-[var(--muted)] transition-colors">
+                      <p className="font-semibold text-sm">{q}</p>
+                      <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{a}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
             </div>
           )}
 

@@ -226,3 +226,36 @@ export async function getBookingStatus(id: string) {
 
   return { booking };
 }
+
+/** Submit a support ticket (any authenticated user). */
+export async function submitSupportTicket(data: {
+  subject: string;
+  description: string;
+  priority: 'normal' | 'high' | 'critical';
+  booking_id?: string;
+}) {
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'You must be logged in to raise a support ticket.' };
+
+  if (!data.subject?.trim() || !data.description?.trim()) {
+    return { error: 'Subject and description are required.' };
+  }
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from('support_tickets').insert({
+    user_id: user.id,
+    subject: data.subject.trim(),
+    description: data.description.trim(),
+    priority: data.priority ?? 'normal',
+    booking_id: data.booking_id || null,
+    status: 'open',
+  });
+
+  if (error) {
+    console.error('[submitSupportTicket] error:', error.message);
+    return { error: 'Failed to submit your ticket. Please try again.' };
+  }
+
+  return { success: true };
+}
