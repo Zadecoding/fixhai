@@ -52,7 +52,7 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[var(--primary)]" />
-                <span>Hyderabad, Telangana, India</span>
+                <span>Gurugram, Haryana, India</span>
               </div>
             </div>
             <div className="flex items-center gap-3 mt-6">
@@ -93,7 +93,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="border-t border-[var(--border)] mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-[var(--muted-foreground)]">
-            © 2024 Fixhai. All rights reserved.
+            © 2026 Fixhai. All rights reserved.
           </p>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
