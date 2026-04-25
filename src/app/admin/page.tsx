@@ -67,14 +67,15 @@ export default function AdminDashboard() {
     { label: "Active Techs", value: technicians.filter((t) => t.active).length.toString(), icon: UserCheck, color: "bg-red-100 dark:bg-red-900/30 text-red-600" },
   ];
 
-  const handleVerify = async (id: string, verify: boolean) => {
-    const res = await verifyTechnician(id, verify);
+  const handleVerify = async (id: string, action: 'approved' | 'rejected' | 'pending') => {
+    const res = await verifyTechnician(id, action);
     if (res.error) {
       toast.error(res.error);
     } else {
-      toast.success(verify ? "Technician approved!" : "Technician rejected.");
+      const msg = action === 'approved' ? 'Technician approved!' : action === 'rejected' ? 'Technician rejected.' : 'Status reset to pending.';
+      toast.success(msg);
       setTechnicians((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, verified: verify, active: verify } : t))
+        prev.map((t) => t.id === id ? { ...t, verified: action === 'approved', active: action === 'approved', status: action } : t)
       );
     }
   };
@@ -368,11 +369,18 @@ export default function AdminDashboard() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                           <span className="font-bold">{tech.full_name}</span>
-                          {tech.verified ? (
-                            <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">✓ Verified</span>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-semibold rounded-full">Pending</span>
+
+                          {/* Status badge based on tech.status (falls back to verified bool) */}
+                          {(tech.status === 'approved' || (!tech.status && tech.verified)) && (
+                            <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">✓ Approved</span>
                           )}
+                          {tech.status === 'rejected' && (
+                            <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-semibold rounded-full">✕ Rejected</span>
+                          )}
+                          {(tech.status === 'pending' || (!tech.status && !tech.verified)) && (
+                            <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">⏳ Pending</span>
+                          )}
+
                           {tech.active ? (
                             <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">Active</span>
                           ) : (
@@ -383,20 +391,30 @@ export default function AdminDashboard() {
                           {tech.category} • {tech.city}, {tech.pincode} • {tech.phone}
                         </div>
                       </div>
+
+                      {/* Action buttons */}
                       <div className="flex gap-2">
-                        {!tech.verified && (
+                        {/* Pending: show Approve + Reject */}
+                        {(tech.status === 'pending' || (!tech.status && !tech.verified)) && (
                           <>
-                            <Button size="sm" variant="primary" onClick={() => handleVerify(tech.id, true)}>
+                            <Button size="sm" variant="primary" onClick={() => handleVerify(tech.id, 'approved')}>
                               <Shield className="w-3 h-3" /> Approve
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleVerify(tech.id, false)}>
+                            <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={() => handleVerify(tech.id, 'rejected')}>
                               <X className="w-3 h-3" /> Reject
                             </Button>
                           </>
                         )}
-                        {tech.verified && (
-                          <Button size="sm" variant="outline" onClick={() => handleVerify(tech.id, false)}>
+                        {/* Approved: show Revoke */}
+                        {(tech.status === 'approved' || (!tech.status && tech.verified)) && (
+                          <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={() => handleVerify(tech.id, 'rejected')}>
                             <X className="w-3 h-3" /> Revoke
+                          </Button>
+                        )}
+                        {/* Rejected: show Re-activate */}
+                        {tech.status === 'rejected' && (
+                          <Button size="sm" variant="primary" onClick={() => handleVerify(tech.id, 'approved')}>
+                            <Shield className="w-3 h-3" /> Re-activate
                           </Button>
                         )}
                       </div>

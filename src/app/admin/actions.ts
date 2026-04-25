@@ -61,22 +61,23 @@ export async function getAdminTechnicians() {
   return { technicians };
 }
 
-export async function verifyTechnician(technicianId: string, verify: boolean) {
-  // Validate input types
+export async function verifyTechnician(technicianId: string, action: 'approved' | 'rejected' | 'pending') {
   if (!isValidUUID(technicianId)) {
     return { error: 'Invalid technician ID.' };
-  }
-  if (typeof verify !== 'boolean') {
-    return { error: 'Invalid verification value.' };
   }
 
   const adminUser = await requireAdmin();
   if (!adminUser) return { error: 'Unauthorized' };
 
   const admin = getAdminClient();
+
+  // Map action → verified + active booleans
+  const verified = action === 'approved';
+  const active   = action === 'approved';
+
   const { error } = await admin
     .from('technician_profiles')
-    .update({ verified: verify, active: verify })
+    .update({ verified, active, status: action })
     .eq('id', technicianId);
 
   if (error) {
