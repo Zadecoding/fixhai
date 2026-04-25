@@ -30,11 +30,19 @@ export const metadata: Metadata = {
     "home repair service",
     "Fixhai",
   ],
+  icons: {
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    apple: "/favicon.png",
+    shortcut: "/favicon.png",
+  },
   openGraph: {
     type: "website",
     siteName: "Fixhai",
     title: "Fixhai – Book a Verified Technician",
     description: "Expert technicians at your doorstep. Transparent and fair pricing.",
+    images: [{ url: "/favicon.png" }],
   },
 };
 
