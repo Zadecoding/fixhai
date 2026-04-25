@@ -27,7 +27,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ full_name: "", email: "", phone: "", category: "", city: "", pincode: "", bio: "", experience_years: "" });
+  const [addForm, setAddForm] = useState({ full_name: "", email: "", phone: "", category: "", city: "", pincode: "", bio: "" });
   const [addLoading, setAddLoading] = useState(false);
   const [createdCreds, setCreatedCreds] = useState<{ email: string; tempPassword: string } | null>(null);
   const [showTempPass, setShowTempPass] = useState(false);
@@ -82,10 +82,7 @@ export default function AdminDashboard() {
   const handleAddTechnician = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddLoading(true);
-    const res = await addTechnicianByAdmin({
-      ...addForm,
-      experience_years: addForm.experience_years ? Number(addForm.experience_years) : 0,
-    });
+    const res = await addTechnicianByAdmin({ ...addForm });
     setAddLoading(false);
     if (res.error) {
       toast.error(res.error);
@@ -95,7 +92,7 @@ export default function AdminDashboard() {
       const techRes = await getAdminTechnicians();
       if (techRes.technicians) setTechnicians(techRes.technicians);
       toast.success("Technician added successfully!");
-      setAddForm({ full_name: "", email: "", phone: "", category: "", city: "", pincode: "", bio: "", experience_years: "" });
+      setAddForm({ full_name: "", email: "", phone: "", category: "", city: "", pincode: "", bio: "" });
     }
   };
 

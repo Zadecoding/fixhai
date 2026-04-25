@@ -96,7 +96,6 @@ export async function addTechnicianByAdmin(data: {
   city: string;
   pincode: string;
   bio?: string;
-  experience_years?: number;
 }) {
   const adminUser = await requireAdmin();
   if (!adminUser) return { error: 'Unauthorized' };
@@ -168,8 +167,7 @@ export async function addTechnicianByAdmin(data: {
       city: data.city.trim(),
       pincode: data.pincode.trim(),
       bio: data.bio?.trim() ?? null,
-      experience_years: data.experience_years ?? 0,
-      verified: true,  // Admin-added technicians are pre-verified
+      verified: true,
       active: true,
       rating: 0,
     })
