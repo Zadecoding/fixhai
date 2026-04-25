@@ -55,8 +55,8 @@ export default function CustomerDashboard() {
   }, []);
 
   const totalSpent = bookings
-    .filter(b => b.status === 'COMPLETED' || b.payment_status === 'PAID')
-    .reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    .filter(b => b.payment_status === 'paid')
+    .reduce((sum, b) => sum + (b.booking_fee || b.total_amount || 0), 0);
 
   const statsCards = [
     { label: "Total Bookings", value: bookings.length.toString(), icon: CalendarDays, color: "bg-blue-100 dark:bg-blue-900/30 text-blue-600" },

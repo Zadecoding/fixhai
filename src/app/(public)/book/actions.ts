@@ -7,12 +7,8 @@ import { createServerClient } from '@supabase/ssr';
 /**
  * Check if at least one verified & active technician is available
  * for the given service category and customer pincode.
- *
- * Uses the service-role client so RLS is bypassed (we need to
- * query ALL technicians, not just the logged-in user's own row).
  */
 export async function checkAvailability(categorySlug: string, pincode: string) {
-  // ── Auth guard: require a logged-in customer ────────────────────
   const cookieStore = await cookies();
   const anonClient = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,22 +22,17 @@ export async function checkAvailability(categorySlug: string, pincode: string) {
     }
   );
 
-  const {
-    data: { user },
-  } = await anonClient.auth.getUser();
+  const { data: { user } } = await anonClient.auth.getUser();
 
   if (!user) {
     return { error: 'Unauthorized. You must be logged in to book a technician.' };
   }
 
-  // ── Use service-role client to bypass RLS for technician lookup ──
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Strategy 1: exact pincode match on primary `pincode` column
-  // NOTE: do NOT select service_pincodes here — that column may not exist yet
   const { data: exactMatch, error: exactError } = await adminClient
     .from('technician_profiles')
     .select('id, full_name, rating, pincode')
@@ -51,14 +42,10 @@ export async function checkAvailability(categorySlug: string, pincode: string) {
     .eq('active', true);
 
   if (exactError) {
-    console.error('[checkAvailability] exact match error:', exactError);
+    console.error('[checkAvailability] error:', exactError.message);
     return { error: 'Failed to check availability. Please try again.' };
   }
 
-  // Strategy 2: check `service_pincodes` array column (technicians
-  // who cover this pincode in addition to their primary one).
-  // This column is optional — silently skip if it doesn't exist yet.
-  // Run supabase/add_service_pincodes.sql to enable multi-pincode support.
   let arrayMatch: { id: string; full_name: string; rating: number; pincode: string }[] = [];
   try {
     const { data, error: arrayError } = await adminClient
@@ -67,21 +54,17 @@ export async function checkAvailability(categorySlug: string, pincode: string) {
       .eq('category', categorySlug)
       .eq('verified', true)
       .eq('active', true)
-      .contains('service_pincodes', [pincode]);   // PostgreSQL @> operator
+      .contains('service_pincodes', [pincode]);
 
-    if (arrayError) {
-      // Column doesn't exist yet — not a problem, exact match is the fallback
-      console.warn('[checkAvailability] service_pincodes not available yet:', arrayError.message);
-    } else {
+    if (!arrayError) {
       arrayMatch = data ?? [];
     }
   } catch {
-    // silently swallow
+    // service_pincodes column may not exist yet — silently skip
   }
 
-  // Merge both result sets, de-duplicate by id
-  const allMatches = [...(exactMatch ?? []), ...(arrayMatch ?? [])];
-  const unique = Array.from(new Map(allMatches.map((t) => [t.id, t])).values());
+  const allMatches = [...(exactMatch ?? []), ...arrayMatch];
+  const unique = Array.from(new Map(allMatches.map(t => [t.id, t])).values());
 
   if (unique.length === 0) {
     return {
@@ -91,7 +74,6 @@ export async function checkAvailability(categorySlug: string, pincode: string) {
     };
   }
 
-  // Pick the highest-rated technician
   const sorted = unique.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
   const assignedTech = sorted[0];
 
@@ -102,4 +84,88 @@ export async function checkAvailability(categorySlug: string, pincode: string) {
     technician_name: assignedTech.full_name,
     technician_rating: assignedTech.rating,
   };
+}
+
+/**
+ * Persists a confirmed booking record to Supabase after payment succeeds.
+ */
+export async function createBooking(params: {
+  categorySlug: string;
+  issueTitle: string;
+  issueDescription: string;
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  pincode: string;
+  preferredSlot: string;
+  bookingFee: number;
+  technicianId: string | null;
+  razorpayPaymentId: string;
+  razorpayOrderId: string;
+}) {
+  const cookieStore = await cookies();
+  const anonClient = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+      },
+    }
+  );
+
+  const { data: { user } } = await anonClient.auth.getUser();
+  if (!user) return { error: 'Unauthorized.' };
+
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Resolve category slug → id
+  const { data: category } = await adminClient
+    .from('service_categories')
+    .select('id, name')
+    .eq('slug', params.categorySlug)
+    .single();
+
+  if (!category) return { error: 'Invalid service category.' };
+
+  const { data: booking, error } = await adminClient.from('bookings').insert({
+    user_id: user.id,
+    category_id: category.id,
+    service_name: category.name,
+    issue_title: params.issueTitle,
+    issue_description: params.issueDescription,
+    address: params.address,
+    city: params.city,
+    pincode: params.pincode,
+    preferred_time: params.preferredSlot,
+    preferred_slot: params.preferredSlot,
+    booking_fee: params.bookingFee,
+    technician_id: params.technicianId || null,
+    status: 'pending',
+    payment_status: 'paid',
+  }).select('id').single();
+
+  if (error) {
+    console.error('[createBooking] insert error:', error.message);
+    return { error: 'Failed to save booking. Please contact support.' };
+  }
+
+  // Record the payment transaction
+  await adminClient.from('payments').insert({
+    booking_id: booking.id,
+    user_id: user.id,
+    amount: params.bookingFee,
+    payment_type: 'booking_fee',
+    status: 'paid',
+    provider: 'razorpay',
+    transaction_id: params.razorpayPaymentId,
+  });
+
+  return { bookingDbId: booking.id };
 }

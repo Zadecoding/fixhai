@@ -29,7 +29,7 @@ import { getCategories } from "@/app/actions/dashboard";
 import type { ServiceCategory } from "@/types/database";
 import dynamic from "next/dynamic";
 import { useRazorpay } from "react-razorpay";
-import { checkAvailability } from "./actions";
+import { checkAvailability, createBooking } from "./actions";
 
 const Map = dynamic(() => import("@/components/ui/map"), {
   ssr: false,
@@ -67,6 +67,7 @@ export default function BookPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [confirmed, setConfirmed] = useState(false);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [userEmail, setUserEmail] = useState<string>('');
   const [availabilityStatus, setAvailabilityStatus] = useState<{
     checked: boolean;
     available: boolean | null;
@@ -83,6 +84,13 @@ export default function BookPage() {
   useEffect(() => {
     getCategories().then(res => {
       if (res.categories) setCategories(res.categories);
+    });
+    // Get the current user's email for Razorpay prefill
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user?.email) setUserEmail(user.email);
+      });
     });
   }, []);
 
@@ -218,21 +226,42 @@ export default function BookPage() {
       }
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
         amount: order.amount,
         currency: order.currency,
         name: "Fixhai",
         description: "Booking Inspection Fee",
         order_id: order.orderId,
-        handler: function (response: any) {
-          toast.success("Booking confirmed! Technician will be assigned shortly.", {
-            description: `Payment ID: ${response.razorpay_payment_id} | Booking ID: ${bookingId}`,
+        handler: async function (response: any) {
+          // Persist booking to database after payment succeeds
+          const bookingResult = await createBooking({
+            categorySlug: formValues.category,
+            issueTitle: formValues.issue,
+            issueDescription: formValues.issueDescription,
+            name: formValues.name,
+            phone: formValues.phone,
+            address: formValues.address,
+            city: formValues.city,
+            pincode: formValues.pincode,
+            preferredSlot: formValues.timeSlot,
+            bookingFee: inspectionFee,
+            technicianId: availability.technician_id ?? null,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpayOrderId: response.razorpay_order_id,
           });
+
+          if (bookingResult.error) {
+            toast.error(`Payment received but booking save failed: ${bookingResult.error}. Contact support with Payment ID: ${response.razorpay_payment_id}`);
+          } else {
+            toast.success("Booking confirmed! Technician will be assigned shortly.", {
+              description: `Booking ID: ${bookingResult.bookingDbId?.slice(0, 8)} | Payment ID: ${response.razorpay_payment_id}`,
+            });
+          }
           setConfirmed(true);
         },
         prefill: {
           name: formValues.name,
-          email: "customer@example.com",
+          email: userEmail,
           contact: formValues.phone,
         },
         theme: {

@@ -1,9 +1,11 @@
 'use server';
 
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
-// Utility to create a supabase client for server actions
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 async function getSupabase() {
   const cookieStore = await cookies();
   return createServerClient(
@@ -19,19 +21,30 @@ async function getSupabase() {
   );
 }
 
-// Admin supabase for bypassing RLS when needed
-async function getSupabaseAdmin() {
-  return createServerClient(
+function getSupabaseAdmin() {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() { return []; },
-        setAll() {}
-      }
-    }
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 }
+
+/** Returns the verified DB role for the currently authenticated user. */
+async function getAuthenticatedUserWithRole() {
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const admin = getSupabaseAdmin();
+  const { data: profile } = await admin
+    .from('users')
+    .select('id, role')
+    .eq('id', user.id)
+    .single();
+
+  return profile ? { id: profile.id, role: profile.role as string } : null;
+}
+
+// ── Public actions ────────────────────────────────────────────────────────────
 
 export async function getCategories() {
   const supabase = await getSupabase();
@@ -40,89 +53,145 @@ export async function getCategories() {
     .select('*')
     .eq('active', true)
     .order('name');
-    
+
   if (error) {
-    console.error('Error fetching categories:', error);
+    console.error('[getCategories] error:', error.message);
     return { categories: [] };
   }
-  
+
   return { categories };
 }
+
+// ── Customer actions ──────────────────────────────────────────────────────────
 
 export async function getCustomerDashboardData() {
   const supabase = await getSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user) return { error: 'Unauthorized', bookings: [], reviews: [] };
-  
-  const { data: bookings, error: bookingsError } = await supabase
-    .from('bookings')
-    .select('*, technician:technician_profiles(full_name, phone)')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
-    
-  const { data: reviews, error: reviewsError } = await supabase
-    .from('reviews')
-    .select('*, technician:technician_profiles(full_name)')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
-    
-  return { 
-    bookings: bookings || [], 
-    reviews: reviews || [] 
+
+  const [{ data: bookings }, { data: reviews }] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select('*, technician:technician_profiles(full_name, phone)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('reviews')
+      .select('*, technician:technician_profiles(full_name)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  return {
+    bookings: bookings ?? [],
+    reviews: reviews ?? [],
   };
 }
 
-export async function getTechnicianAssignedBookings(technicianId: string) {
-  const supabaseAdmin = await getSupabaseAdmin(); // Admin used since RLS might block if technician doesn't own it directly
-  
-  const { data: bookings, error } = await supabaseAdmin
+// ── Technician actions ────────────────────────────────────────────────────────
+
+/**
+ * Fetches bookings assigned to a technician.
+ * Verifies the caller is the technician via their auth session.
+ */
+export async function getTechnicianAssignedBookings() {
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return { error: 'Unauthorized', bookings: [] };
+
+  const admin = getSupabaseAdmin();
+
+  // Find the technician profile that belongs to this user
+  const { data: techProfile } = await admin
+    .from('technician_profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single();
+
+  if (!techProfile) {
+    return { error: 'Technician profile not found.', bookings: [] };
+  }
+
+  const { data: bookings, error } = await admin
     .from('bookings')
     .select('*, user:users(name, phone)')
-    .eq('technician_id', technicianId)
+    .eq('technician_id', techProfile.id)
     .order('created_at', { ascending: false });
-    
-  return { bookings: bookings || [] };
+
+  if (error) {
+    console.error('[getTechnicianAssignedBookings] error:', error.message);
+    return { error: 'Failed to fetch bookings.', bookings: [] };
+  }
+
+  return { bookings: bookings ?? [] };
 }
 
+// ── Admin actions ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetches all admin dashboard data.
+ * Verifies the caller has role = 'admin' in the database.
+ */
 export async function getAdminDashboardData() {
-  const supabaseAdmin = await getSupabaseAdmin();
-  
-  const { data: bookings } = await supabaseAdmin
-    .from('bookings')
-    .select('*, user:users(name), technician:technician_profiles(full_name)')
-    .order('created_at', { ascending: false });
-    
-  const { data: tickets } = await supabaseAdmin
-    .from('support_tickets')
-    .select('*, user:users(name)')
-    .order('created_at', { ascending: false });
-    
-  const { data: users } = await supabaseAdmin
-    .from('users')
-    .select('id, name, email, role, created_at')
-    .order('created_at', { ascending: false });
-    
-  return { 
-    bookings: bookings || [], 
-    tickets: tickets || [],
-    users: users || []
+  const caller = await getAuthenticatedUserWithRole();
+
+  if (!caller || caller.role !== 'admin') {
+    return { error: 'Forbidden', bookings: [], tickets: [], users: [] };
+  }
+
+  const admin = getSupabaseAdmin();
+
+  const [{ data: bookings }, { data: tickets }, { data: users }] = await Promise.all([
+    admin
+      .from('bookings')
+      .select('*, user:users(name), technician:technician_profiles(full_name)')
+      .order('created_at', { ascending: false }),
+    admin
+      .from('support_tickets')
+      .select('*, user:users(name)')
+      .order('created_at', { ascending: false }),
+    admin
+      .from('users')
+      .select('id, name, email, role, created_at')
+      .order('created_at', { ascending: false }),
+  ]);
+
+  return {
+    bookings: bookings ?? [],
+    tickets: tickets ?? [],
+    users: users ?? [],
   };
 }
 
+/**
+ * Fetches a single booking's status.
+ * Only the booking owner can fetch their own booking.
+ */
 export async function getBookingStatus(id: string) {
-  const supabaseAdmin = await getSupabaseAdmin();
-  
-  const { data: booking, error } = await supabaseAdmin
-    .from('bookings')
-    .select('*, technician:technician_profiles(*)')
-    .eq('id', id)
-    .single();
-    
-  if (error) {
-    console.error('Error fetching booking status:', error);
-    return { error: error.message };
+  if (!id || typeof id !== 'string') {
+    return { error: 'Invalid booking ID.' };
   }
-  
+
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return { error: 'Unauthorized.' };
+
+  const admin = getSupabaseAdmin();
+
+  // Fetch the booking only if the user owns it
+  const { data: booking, error } = await admin
+    .from('bookings')
+    .select('*, technician:technician_profiles(full_name, phone, rating, category, city)')
+    .eq('id', id)
+    .eq('user_id', user.id)   // ← ownership check
+    .single();
+
+  if (error || !booking) {
+    return { error: 'Booking not found.' };
+  }
+
   return { booking };
 }

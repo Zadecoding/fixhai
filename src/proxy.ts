@@ -2,9 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,10 +13,8 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -27,65 +23,72 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // refreshing the auth token
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresh the auth token
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const protectedRoutes = ['/dashboard', '/technician', '/admin', '/book', '/booking'];
-  const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route));
-
+  // ── Convenient redirects ──────────────────────────────────────────
   if (request.nextUrl.pathname === '/login') {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
     return NextResponse.redirect(url);
   }
-
   if (request.nextUrl.pathname === '/signup') {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/signup';
     return NextResponse.redirect(url);
   }
 
+  // ── Protected route guard ─────────────────────────────────────────
+  const protectedRoutes = ['/dashboard', '/technician', '/admin', '/book', '/booking'];
+  const isProtectedRoute = protectedRoutes.some(route =>
+    request.nextUrl.pathname.startsWith(route)
+  );
+
   if (isProtectedRoute && !user) {
-    // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
-    url.searchParams.set('next', request.nextUrl.pathname);
+    // Guard against open-redirect: only allow same-origin paths
+    const next = request.nextUrl.pathname;
+    if (next.startsWith('/') && !next.startsWith('//')) {
+      url.searchParams.set('next', next);
+    }
     return NextResponse.redirect(url);
   }
 
-  // Restrict /admin route to admin email
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    if (user?.email !== 'imsanju4141@gmail.com' && user?.user_metadata?.role !== 'admin') {
+  // ── Role-based route restrictions ────────────────────────────────
+  // NOTE: We check user_metadata here for fast middleware perf.
+  // The authoritative check is always re-done server-side in each action/page.
+  if (user) {
+    const role = user.user_metadata?.role as string | undefined;
+
+    // Restrict /admin to admin role
+    if (request.nextUrl.pathname.startsWith('/admin') && role !== 'admin') {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);
     }
-  }
 
-  // Restrict /technician route to technician role
-  if (request.nextUrl.pathname.startsWith('/technician')) {
-    if (user?.user_metadata?.role !== 'technician') {
+    // Restrict /technician to technician role
+    if (request.nextUrl.pathname.startsWith('/technician') && role !== 'technician') {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);
     }
-  }
 
-  // Optional: Redirect authenticated users away from login/signup pages
-  const authRoutes = ['/auth/login', '/auth/signup'];
-  const isAuthRoute = authRoutes.some(route => request.nextUrl.pathname.startsWith(route));
-
-  if (isAuthRoute && user) {
-    const url = request.nextUrl.clone();
-    // Default to dashboard, or ideally check their role from a profile table
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+    // Redirect already-authenticated users away from login/signup
+    const authRoutes = ['/auth/login', '/auth/signup'];
+    if (authRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
+      const url = request.nextUrl.clone();
+      if (role === 'admin') url.pathname = '/admin';
+      else if (role === 'technician') url.pathname = '/technician';
+      else url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
 }
+
 
 export const config = {
   matcher: [

@@ -3,11 +3,19 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+
+/** Allowed roles a user can self-select during signup */
+const ALLOWED_SIGNUP_ROLES = new Set(['customer', 'technician']);
 
 export async function login(formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
+
+  if (!email || !password) {
+    return { error: 'Email and password are required.' };
+  }
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -23,41 +31,60 @@ export async function login(formData: FormData) {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch (error) {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+          } catch {
+            // Ignored — middleware handles session refresh
           }
         },
       },
     }
   );
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  const next = formData.get('next') as string | null;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     return { error: error.message };
   }
 
-  // Determine redirect based on role (for simplicity, sending to dashboard)
+  // After login, fetch actual role from DB to determine redirect
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  const { data: profile } = await adminClient
+    .from('users')
+    .select('role')
+    .eq('id', user!.id)
+    .single();
+
   revalidatePath('/', 'layout');
-  if (next && next.startsWith('/')) {
+
+  const next = formData.get('next') as string | null;
+  if (next && next.startsWith('/') && !next.startsWith('//')) {
     redirect(next);
-  } else {
-    redirect('/dashboard');
   }
+
+  const role = profile?.role ?? 'customer';
+  if (role === 'admin') redirect('/admin');
+  if (role === 'technician') redirect('/technician');
+  redirect('/dashboard');
 }
 
 export async function signup(formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
   const name = formData.get('name') as string;
-  const role = formData.get('role') as string; // 'customer' or 'technician'
+  const rawRole = formData.get('role') as string;
+
+  // ── Security: only allow safe roles ──────────────────────────────
+  const role = ALLOWED_SIGNUP_ROLES.has(rawRole) ? rawRole : 'customer';
+
+  if (!email || !password || !name) {
+    return { error: 'All fields are required.' };
+  }
+  if (password.length < 8) {
+    return { error: 'Password must be at least 8 characters.' };
+  }
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -73,7 +100,8 @@ export async function signup(formData: FormData) {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch (error) {
+          } catch {
+            // Ignored
           }
         },
       },
@@ -86,52 +114,43 @@ export async function signup(formData: FormData) {
     options: {
       data: {
         full_name: name,
-        role: role,
+        // Store role in metadata for convenience, but DB is authoritative
+        role,
       },
     },
   });
-
-  const next = formData.get('next') as string | null;
 
   if (error) {
     return { error: error.message };
   }
 
-  // Insert user into public.users table to satisfy foreign key constraints
+  // Upsert user into public.users using service-role key (bypasses RLS)
   if (data.user) {
-    const supabaseAdmin = createServerClient(
+    const adminClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() { return []; },
-          setAll() {}
-        }
-      }
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-    
-    // Check if user already exists (in case of double clicks or existing auth)
-    const { data: existingUser } = await supabaseAdmin.from('users').select('id').eq('id', data.user.id).single();
-    
-    if (!existingUser) {
-      await supabaseAdmin.from('users').insert({
+
+    const { error: insertError } = await adminClient.from('users').upsert(
+      {
         id: data.user.id,
         email: data.user.email,
-        name: name,
-        role: role
-      });
+        name,
+        // Role is set server-side — never trust the raw form value
+        role,
+      },
+      { onConflict: 'id' }
+    );
+
+    if (insertError) {
+      console.error('[signup] Failed to insert user profile:', insertError.message);
     }
   }
 
   revalidatePath('/', 'layout');
-  
-  if (next && next.startsWith('/')) {
-    redirect(next);
-  } else if (role === 'technician') {
-    redirect('/technician');
-  } else {
-    redirect('/dashboard');
-  }
+
+  if (role === 'technician') redirect('/technician');
+  redirect('/dashboard');
 }
 
 export async function logout() {
@@ -149,7 +168,8 @@ export async function logout() {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch (error) {
+          } catch {
+            // Ignored
           }
         },
       },
