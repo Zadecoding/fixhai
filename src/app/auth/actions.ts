@@ -45,7 +45,7 @@ export async function login(formData: FormData) {
     return { error: error.message };
   }
 
-  // After login, fetch actual role from DB to determine redirect
+  // After login, fetch actual role from DB (authoritative source)
   const { data: { user } } = await supabase.auth.getUser();
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,6 +57,16 @@ export async function login(formData: FormData) {
     .eq('id', user!.id)
     .single();
 
+  const role = profile?.role ?? 'customer';
+
+  // Sync DB role into auth user_metadata so the middleware JWT is always correct.
+  // This means promoting a user to admin in the DB takes effect on their NEXT login.
+  if (user!.user_metadata?.role !== role) {
+    await adminClient.auth.admin.updateUserById(user!.id, {
+      user_metadata: { ...user!.user_metadata, role },
+    });
+  }
+
   revalidatePath('/', 'layout');
 
   const next = formData.get('next') as string | null;
@@ -64,7 +74,6 @@ export async function login(formData: FormData) {
     redirect(next);
   }
 
-  const role = profile?.role ?? 'customer';
   if (role === 'admin') redirect('/admin');
   if (role === 'technician') redirect('/technician');
   redirect('/dashboard');
