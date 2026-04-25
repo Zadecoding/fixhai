@@ -143,14 +143,14 @@ export async function getAdminDashboardData() {
 
   const admin = getSupabaseAdmin();
 
-  const [{ data: bookings }, { data: tickets }, { data: users }] = await Promise.all([
+  const [bookingsResult, ticketsResult, usersResult] = await Promise.all([
     admin
       .from('bookings')
       .select('*, user:users(name), technician:technician_profiles(full_name)')
       .order('created_at', { ascending: false }),
     admin
       .from('support_tickets')
-      .select('*, user:users(name)')
+      .select('id, subject, description, priority, status, created_at, user_id, booking_id, user:users(name, email)')
       .order('created_at', { ascending: false }),
     admin
       .from('users')
@@ -158,11 +158,42 @@ export async function getAdminDashboardData() {
       .order('created_at', { ascending: false }),
   ]);
 
+  if (bookingsResult.error) {
+    console.error('[getAdminDashboardData] bookings error:', bookingsResult.error.message);
+  }
+  if (ticketsResult.error) {
+    console.error('[getAdminDashboardData] tickets error:', ticketsResult.error.message);
+  }
+  if (usersResult.error) {
+    console.error('[getAdminDashboardData] users error:', usersResult.error.message);
+  }
+
   return {
-    bookings: bookings ?? [],
-    tickets: tickets ?? [],
-    users: users ?? [],
+    bookings: bookingsResult.data ?? [],
+    tickets: ticketsResult.data ?? [],
+    users: usersResult.data ?? [],
   };
+}
+
+/** Update a support ticket's status (admin only). */
+export async function updateTicketStatus(ticketId: string, status: 'open' | 'in_progress' | 'resolved' | 'closed') {
+  const caller = await getAuthenticatedUserWithRole();
+  if (!caller || caller.role !== 'admin') return { error: 'Forbidden' };
+
+  if (!ticketId || typeof ticketId !== 'string') return { error: 'Invalid ticket ID.' };
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from('support_tickets')
+    .update({ status })
+    .eq('id', ticketId);
+
+  if (error) {
+    console.error('[updateTicketStatus] error:', error.message);
+    return { error: 'Failed to update ticket status.' };
+  }
+
+  return { success: true };
 }
 
 /**

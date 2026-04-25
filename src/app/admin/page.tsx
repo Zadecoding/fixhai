@@ -13,7 +13,7 @@ import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import type { BookingStatus } from "@/types/database";
 import { getAdminTechnicians, verifyTechnician, addTechnicianByAdmin } from "./actions";
-import { getAdminDashboardData, getCategories } from "@/app/actions/dashboard";
+import { getAdminDashboardData, getCategories, updateTicketStatus } from "@/app/actions/dashboard";
 
 const adminTabs = ["Overview", "Bookings", "Technicians", "Categories", "Complaints"];
 
@@ -98,6 +98,16 @@ export default function AdminDashboard() {
   };
 
   const resetModal = () => { setShowAddModal(false); setCreatedCreds(null); setShowTempPass(false); };
+
+  const handleTicketStatus = async (ticketId: string, status: 'open' | 'in_progress' | 'resolved' | 'closed') => {
+    const res = await updateTicketStatus(ticketId, status);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success(`Ticket marked as ${status.replace('_', ' ')}.`);
+      setTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, status } : t));
+    }
+  };
 
   const exportCSV = () => {
     const headers = ["ID", "Service", "Issue", "Status", "City", "Fee", "Created At"];
@@ -463,17 +473,32 @@ export default function AdminDashboard() {
           {/* COMPLAINTS */}
           {activeTab === "Complaints" && (
             <Card>
-              <div className="px-6 py-4 border-b border-[var(--border)]">
+              <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
                 <h3 className="font-bold">Customer Complaints &amp; Support</h3>
+                <div className="flex gap-2 text-xs">
+                  {['open','in_progress','resolved'].map((s) => (
+                    <span key={s} className={`px-2.5 py-1 rounded-full font-semibold ${
+                      s === 'open' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700' :
+                      s === 'in_progress' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700' :
+                      'bg-green-100 dark:bg-green-900/30 text-green-700'
+                    }`}>
+                      {tickets.filter((t) => t.status === s).length} {s.replace('_',' ')}
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="divide-y divide-[var(--border)]">
                 {tickets.length === 0 ? (
-                  <p className="text-center text-[var(--muted-foreground)] py-10">No support tickets found.</p>
+                  <div className="text-center py-16 text-[var(--muted-foreground)]">
+                    <CheckCircle2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">No support tickets</p>
+                    <p className="text-sm mt-1">All clear — no complaints raised yet.</p>
+                  </div>
                 ) : (
                   tickets.map((ticket) => (
-                    <div key={ticket.id} className="px-6 py-4 flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
+                    <div key={ticket.id} className="px-6 py-4 flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="font-semibold text-sm">{ticket.subject}</span>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             ticket.priority === "critical"
@@ -487,10 +512,10 @@ export default function AdminDashboard() {
                         </div>
                         <div className="text-xs text-[var(--muted-foreground)] mb-2 max-w-2xl">{ticket.description}</div>
                         <div className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider font-semibold">
-                          {formatDate(ticket.created_at)} • {ticket.user?.name || "Anonymous"}
+                          {formatDate(ticket.created_at)} • {ticket.user?.name || ticket.user?.email || "Anonymous"}
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
+                      <div className="flex flex-col items-end gap-2 shrink-0">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                           ticket.status === "open"
                             ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
@@ -500,6 +525,33 @@ export default function AdminDashboard() {
                         }`}>
                           {(ticket.status || "open").replace("_", " ").toUpperCase()}
                         </span>
+                        {/* Quick action buttons */}
+                        <div className="flex gap-1">
+                          {ticket.status !== 'in_progress' && ticket.status !== 'resolved' && ticket.status !== 'closed' && (
+                            <button
+                              onClick={() => handleTicketStatus(ticket.id, 'in_progress')}
+                              className="text-[10px] px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-semibold hover:bg-blue-100 transition-colors"
+                            >
+                              In Progress
+                            </button>
+                          )}
+                          {ticket.status !== 'resolved' && ticket.status !== 'closed' && (
+                            <button
+                              onClick={() => handleTicketStatus(ticket.id, 'resolved')}
+                              className="text-[10px] px-2 py-1 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 font-semibold hover:bg-green-100 transition-colors"
+                            >
+                              Resolve
+                            </button>
+                          )}
+                          {ticket.status === 'resolved' && (
+                            <button
+                              onClick={() => handleTicketStatus(ticket.id, 'closed')}
+                              className="text-[10px] px-2 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-semibold hover:bg-zinc-200 transition-colors"
+                            >
+                              Close
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))
