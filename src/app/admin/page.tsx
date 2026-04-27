@@ -374,7 +374,13 @@ export default function AdminDashboard() {
                   <p className="text-sm mt-1">Click "Add Technician" to get started.</p>
                 </div>
               ) : (
-                technicians.map((tech) => (
+                technicians.map((tech) => {
+                  const isBusy = bookings.some(b => 
+                    b.technician_id === tech.id && 
+                    ['assigned', 'on_the_way', 'diagnosis_complete'].includes(b.status)
+                  );
+                  
+                  return (
                   <Card key={tech.id} className="p-5">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] flex items-center justify-center text-white font-bold text-lg">
@@ -395,7 +401,9 @@ export default function AdminDashboard() {
                             <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">⏳ Pending</span>
                           )}
 
-                          {tech.active ? (
+                          {isBusy ? (
+                            <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs font-semibold rounded-full">Busy</span>
+                          ) : tech.active ? (
                             <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">Active</span>
                           ) : (
                             <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] text-xs font-semibold rounded-full">Inactive</span>
