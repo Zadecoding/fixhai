@@ -158,8 +158,8 @@ export async function signup(formData: FormData) {
 
   revalidatePath('/', 'layout');
 
-  if (role === 'technician') redirect('/technician');
-  redirect('/dashboard');
+  // Always send new signups to the verify-email prompt
+  redirect('/auth/verify-email');
 }
 
 export async function logout() {

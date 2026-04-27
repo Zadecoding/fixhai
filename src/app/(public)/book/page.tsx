@@ -119,7 +119,7 @@ export default function BookPage() {
   const { Razorpay } = useRazorpay();
 
   const selectedCategory = categories.find((c) => c.slug === formValues.category);
-  const inspectionFee = formValues.category === 'mobile-repair' ? 99 : 399;
+  const inspectionFee = formValues.category === 'mobile-repair' ? 0 : 399;
 
   const [isChecking, setIsChecking] = useState(false);
 
@@ -212,7 +212,36 @@ export default function BookPage() {
         return;
       }
 
-      // Step 2: Initialize Payment
+      // --- FREE BOOKING: Skip Razorpay for ₹0 inspection fee ---
+      if (inspectionFee === 0) {
+        const bookingResult = await createBooking({
+          categorySlug: formValues.category,
+          issueTitle: formValues.issue,
+          issueDescription: formValues.issueDescription,
+          name: formValues.name,
+          phone: formValues.phone,
+          address: formValues.address,
+          city: formValues.city,
+          pincode: formValues.pincode,
+          preferredSlot: formValues.timeSlot,
+          bookingFee: 0,
+          technicianId: availability.technician_id ?? null,
+          razorpayPaymentId: 'free',
+          razorpayOrderId: 'free',
+        });
+        if (bookingResult.error) {
+          toast.error(`Booking failed: ${bookingResult.error}`);
+        } else {
+          toast.success('Booking confirmed! Technician will be assigned shortly.', {
+            description: `Booking ID: ${bookingResult.bookingDbId?.slice(0, 8)} | No inspection fee for mobile repairs.`,
+          });
+          setConfirmed(true);
+        }
+        setIsChecking(false);
+        return;
+      }
+
+      // Step 2: Initialize Razorpay Payment for paid categories
       const response = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -222,6 +251,7 @@ export default function BookPage() {
 
       if (order.error) {
         toast.error("Failed to initiate payment");
+        setIsChecking(false);
         return;
       }
 
@@ -278,6 +308,8 @@ export default function BookPage() {
       rzp1.open();
     } catch (err) {
       toast.error("Payment integration error");
+    } finally {
+      setIsChecking(false);
     }
   };
 
@@ -338,7 +370,7 @@ export default function BookPage() {
         <div className="text-center mb-10">
           <h1 className="text-3xl font-extrabold tracking-tight mb-2">Book a Technician</h1>
           <p className="text-[var(--muted-foreground)]">
-            Just ₹99 (Mobile) or ₹399 (Other) inspection fee. Honest quote. Pay only if satisfied.
+            Mobile repair: <span className="text-green-600 font-bold">FREE inspection</span> · Other appliances: ₹399. Honest quote. Pay only if satisfied.
           </p>
         </div>
 
@@ -513,14 +545,20 @@ export default function BookPage() {
                     The technician will visit this location
                   </p>
                   
-                  <div className="w-full h-48 mb-6 rounded-xl border border-[var(--border)] overflow-hidden">
+                  <div className="w-full h-56 mb-3 rounded-xl border border-[var(--border)] overflow-hidden">
                     <Map 
                       location={formValues.location as [number, number] || [17.3850, 78.4867]} 
-                      onChange={(loc) => setValue("location", loc)} 
+                      onChange={(loc) => setValue("location", loc)}
+                      geocodeQuery={[
+                        formValues.address,
+                        formValues.city,
+                        formValues.pincode
+                      ].filter(Boolean).join(', ')}
                     />
                   </div>
-                  <p className="text-xs text-[var(--muted-foreground)] text-center mb-6 -mt-4">
-                    Drag the map to drop the pin on your exact location
+                  <p className="text-xs text-[var(--muted-foreground)] text-center mb-5 flex items-center justify-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    Map auto-updates as you type your address · Click map to adjust pin
                   </p>
 
                   <div className="space-y-4">
@@ -588,7 +626,9 @@ export default function BookPage() {
                 <div>
                   <h2 className="text-lg font-bold mb-1">Review & Pay</h2>
                   <p className="text-sm text-[var(--muted-foreground)] mb-6">
-                    Confirm your booking details and pay ₹{inspectionFee}
+                    {inspectionFee === 0
+                      ? 'Confirm your booking details — mobile inspection is FREE!'
+                      : `Confirm your booking details and pay ₹${inspectionFee}`}
                   </p>
 
                   {/* Availability Badge */}
@@ -640,13 +680,23 @@ export default function BookPage() {
                     ))}
                     <div className="border-t border-[var(--border)] my-2 pt-3 flex justify-between">
                       <span className="font-bold">Booking Fee</span>
-                      <span className="text-xl font-extrabold text-[var(--primary)]">₹{inspectionFee}</span>
+                      {inspectionFee === 0 ? (
+                        <span className="text-xl font-extrabold text-green-600">FREE 🎉</span>
+                      ) : (
+                        <span className="text-xl font-extrabold text-[var(--primary)]">₹{inspectionFee}</span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 mb-6 text-sm text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
-                    <strong>Note:</strong> ₹{inspectionFee} is the inspection/visit fee only. The actual repair cost will be quoted by the technician after diagnosis. You pay repair charges only if you approve.
-                  </div>
+                  {inspectionFee === 0 ? (
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 mb-6 text-sm text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800">
+                      🎉 <strong>Mobile repair inspection is completely FREE!</strong> The technician will diagnose your device at no charge. Repair charges are quoted after diagnosis — you pay only if you approve.
+                    </div>
+                  ) : (
+                    <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 mb-6 text-sm text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
+                      <strong>Note:</strong> ₹{inspectionFee} is the inspection/visit fee only. The actual repair cost will be quoted by the technician after diagnosis. You pay repair charges only if you approve.
+                    </div>
+                  )}
 
                   <Button
                     size="xl"
@@ -660,6 +710,8 @@ export default function BookPage() {
                       ? 'Checking Availability...'
                       : availabilityStatus.checked && availabilityStatus.available === false
                       ? 'No Technicians Available in Your Area'
+                      : inspectionFee === 0
+                      ? 'Confirm Free Booking 🎉'
                       : `Pay ₹${inspectionFee} & Confirm Booking`}
                   </Button>
                 </div>

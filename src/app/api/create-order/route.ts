@@ -33,7 +33,11 @@ export async function POST(request: Request) {
     const { category, currency = 'INR', receipt } = body;
 
     // Secure calculation of amount on the server
-    const amount = category === 'mobile-repair' ? 99 : 399;
+    // Mobile repair inspection is FREE — client should not call this route for mobile
+    const amount = category === 'mobile-repair' ? 0 : 399;
+    if (amount === 0) {
+      return NextResponse.json({ error: 'Mobile repair bookings are free — no payment required.' }, { status: 400 });
+    }
 
     const options = {
       amount: amount * 100, // amount in smallest currency unit (paise)
