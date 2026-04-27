@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ full_name: "", email: "", phone: "", category: "", city: "", pincode: "", bio: "" });
   const [addLoading, setAddLoading] = useState(false);
@@ -230,6 +231,9 @@ export default function AdminDashboard() {
                             </div>
                             <div className="flex items-center gap-3">
                               {booking.status && <StatusBadge status={booking.status as BookingStatus} />}
+                              <Button variant="outline" size="sm" onClick={() => setSelectedBooking(booking)}>
+                                View
+                              </Button>
                             </div>
                           </div>
                         );
@@ -322,8 +326,8 @@ export default function AdminDashboard() {
                           .map((booking) => {
                             const category = categories.find((c) => c.id === booking.category_id);
                             return (
-                              <tr key={booking.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]/50">
-                                <td className="px-4 py-3 font-mono text-xs">{booking.id.slice(0, 8)}...</td>
+                              <tr key={booking.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)]/50 cursor-pointer" onClick={() => setSelectedBooking(booking)}>
+                                <td className="px-4 py-3 font-mono text-xs text-[var(--primary)] font-semibold underline underline-offset-2">{booking.id.slice(0, 8)}...</td>
                                 <td className="px-4 py-3 font-medium">{category?.name || "—"}</td>
                                 <td className="px-4 py-3 text-[var(--muted-foreground)]">{booking.issue_title}</td>
                                 <td className="px-4 py-3">{booking.city}</td>
@@ -692,6 +696,107 @@ export default function AdminDashboard() {
                   </div>
                 </form>
               )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+
+    {/* ── Booking Details Modal ─────────────────────────────── */}
+    <AnimatePresence>
+      {selectedBooking && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            onClick={() => setSelectedBooking(null)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-[var(--background)] shadow-2xl z-50 rounded-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)] shrink-0">
+              <div>
+                <h2 className="font-extrabold text-lg">Booking Details</h2>
+                <p className="font-mono text-xs text-[var(--muted-foreground)] mt-1">{selectedBooking.id}</p>
+              </div>
+              <button onClick={() => setSelectedBooking(null)} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[var(--muted)] transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-6">
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-1">Status</p>
+                  <StatusBadge status={selectedBooking.status as BookingStatus} />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-1">Payment</p>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${selectedBooking.payment_status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                    {selectedBooking.payment_status?.toUpperCase() || 'PENDING'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold border-b border-[var(--border)] pb-1">Customer & Location</h3>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Customer Name</p>
+                    <p className="font-medium">{selectedBooking.user?.name || "Unknown"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">City / Pincode</p>
+                    <p className="font-medium">{selectedBooking.city} - {selectedBooking.pincode}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Address</p>
+                    <p className="font-medium text-[var(--muted-foreground)]">{selectedBooking.address}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold border-b border-[var(--border)] pb-1">Service Request</h3>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div className="col-span-2">
+                    <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Issue</p>
+                    <p className="font-medium">{selectedBooking.issue_title}</p>
+                    {selectedBooking.issue_description && (
+                      <p className="text-xs text-[var(--muted-foreground)] mt-1">{selectedBooking.issue_description}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Booking Fee</p>
+                    <p className="font-bold text-green-600">₹{selectedBooking.booking_fee}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Preferred Slot</p>
+                    <p className="font-medium">{selectedBooking.preferred_slot || selectedBooking.preferred_time || "Any time"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold border-b border-[var(--border)] pb-1">Technician</h3>
+                {selectedBooking.technician ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-bold">
+                      {selectedBooking.technician.full_name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">{selectedBooking.technician.full_name}</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">Assigned Expert</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-amber-600 font-semibold bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-900">
+                    No technician assigned yet.
+                  </p>
+                )}
+              </div>
+
             </div>
           </motion.div>
         </>
