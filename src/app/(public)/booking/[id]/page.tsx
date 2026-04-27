@@ -23,12 +23,13 @@ const timelineSteps: { status: BookingStatus; label: string; description: string
   { status: "pending", label: "Booking Received", description: "Your booking and ₹99 fee received" },
   { status: "assigned", label: "Booking Confirmed", description: "A verified technician has been assigned" },
   { status: "on_the_way", label: "Technician on the Way", description: "Expert is heading to your location" },
+  { status: "diagnosing", label: "Diagnosing Issue", description: "Technician is inspecting the problem" },
   { status: "diagnosis_complete", label: "Diagnosis Complete", description: "Issue identified, quote shared" },
   { status: "completed", label: "Job Completed", description: "Repair done successfully! 🎉" },
 ];
 
 const statusOrder: BookingStatus[] = [
-  "pending", "assigned", "on_the_way", "diagnosis_complete", "completed",
+  "pending", "assigned", "on_the_way", "diagnosing", "diagnosis_complete", "completed",
 ];
 
 interface Props {

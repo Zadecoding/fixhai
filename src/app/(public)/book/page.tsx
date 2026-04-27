@@ -233,9 +233,14 @@ export default function BookPage() {
         if (bookingResult.error) {
           toast.error(`Booking failed: ${bookingResult.error}`);
         } else {
-          toast.success('Booking confirmed! Technician will be assigned shortly.', {
-            description: `Booking ID: ${bookingResult.bookingDbId?.slice(0, 8)} | No inspection fee for mobile repairs.`,
-          });
+          toast.success(
+            availability.technician_id 
+              ? 'Booking confirmed! A verified technician has been assigned to you.' 
+              : 'Booking confirmed! A technician will be assigned shortly.', 
+            {
+              description: `Booking ID: ${bookingResult.bookingDbId?.slice(0, 8)} | No inspection fee for mobile repairs.`,
+            }
+          );
           if (bookingResult.bookingDbId) {
             setActualBookingId(bookingResult.bookingDbId);
           }
@@ -287,9 +292,14 @@ export default function BookPage() {
           if (bookingResult.error) {
             toast.error(`Payment received but booking save failed: ${bookingResult.error}. Contact support with Payment ID: ${response.razorpay_payment_id}`);
           } else {
-            toast.success("Booking confirmed! Technician will be assigned shortly.", {
-              description: `Booking ID: ${bookingResult.bookingDbId?.slice(0, 8)} | Payment ID: ${response.razorpay_payment_id}`,
-            });
+            toast.success(
+              availability.technician_id 
+                ? "Booking confirmed! A verified technician has been assigned to you." 
+                : "Booking confirmed! A technician will be assigned shortly.", 
+              {
+                description: `Booking ID: ${bookingResult.bookingDbId?.slice(0, 8)} | Payment ID: ${response.razorpay_payment_id}`,
+              }
+            );
             if (bookingResult.bookingDbId) {
               setActualBookingId(bookingResult.bookingDbId);
             }
@@ -333,7 +343,9 @@ export default function BookPage() {
           </div>
           <h1 className="text-2xl font-extrabold mb-2">Booking Confirmed!</h1>
           <p className="text-[var(--muted-foreground)] mb-2">
-            Your booking has been received. A verified technician will be assigned shortly.
+            Your booking has been received. {availabilityStatus.technicianName 
+              ? `Your technician, ${availabilityStatus.technicianName}, has been assigned!` 
+              : 'A verified technician will be assigned shortly.'}
           </p>
           <div className="bg-[var(--muted)] rounded-2xl p-4 mb-6 text-sm">
             <div className="flex justify-between mb-2">

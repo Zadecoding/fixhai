@@ -243,26 +243,11 @@ export default function TechnicianDashboardClient({
                       </div>
                       
                       <div className="flex gap-2">
-                        {currentStatus === 'pending' && (
-                          <Button size="sm" variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={() => updateStatus(booking.id, 'assigned')}>
-                            Accept Job
+                        <Link href={`/technician/job/${booking.id}`} className="w-full">
+                          <Button size="sm" variant="primary" className="w-full">
+                            Manage Job <ChevronRight className="w-4 h-4" />
                           </Button>
-                        )}
-                        {currentStatus === 'assigned' && (
-                          <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 text-white" onClick={() => updateStatus(booking.id, 'on_the_way')}>
-                            I'm on my way
-                          </Button>
-                        )}
-                        {currentStatus === 'on_the_way' && (
-                          <Button size="sm" variant="primary" className="w-full bg-purple-600 hover:bg-purple-700 text-white" onClick={() => updateStatus(booking.id, 'diagnosis_complete')}>
-                            Confirmed Arrival
-                          </Button>
-                        )}
-                        {currentStatus === 'diagnosis_complete' && (
-                          <Button size="sm" variant="primary" className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(booking.id, 'completed')}>
-                            Mark Job as Completed
-                          </Button>
-                        )}
+                        </Link>
                       </div>
                     </Card>
                   );

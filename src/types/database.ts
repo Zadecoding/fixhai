@@ -3,6 +3,7 @@ export type BookingStatus =
   | "pending"
   | "assigned"
   | "on_the_way"
+  | "diagnosing"
   | "diagnosis_complete"
   | "completed"
   | "cancelled";
