@@ -139,7 +139,7 @@ export default function BookingStatusPage({ params }: Props) {
                   <div className="absolute left-4 top-9 bottom-0 w-px">
                     <motion.div
                       initial={{ scaleY: 0 }}
-                      animate={{ scaleY: isComplete ? 1 : 0 }}
+                      animate={{ scaleY: stepIndex < currentStatusIndex && booking?.status !== "cancelled" ? 1 : 0 }}
                       transition={{ duration: 0.5, delay: i * 0.1 }}
                       style={{ transformOrigin: "top" }}
                       className="w-full h-full bg-green-500"
@@ -156,7 +156,7 @@ export default function BookingStatusPage({ params }: Props) {
                   className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center z-10 bg-[var(--background)]"
                 >
                   {isComplete ? (
-                    isActive && booking?.status !== "completed" ? (
+                    isActive && booking?.status !== "completed" && step.status !== "assigned" ? (
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
