@@ -77,7 +77,7 @@ const howItWorks = [
     step: "02",
     icon: Zap,
     title: "Pay Inspection Fee to Book",
-    description: "A small visit fee secures your slot. The final quote comes after diagnosis.",
+    description: "Mobile inspection is FREE! For other appliances, a small ₹399 visit fee secures your slot. The final quote comes after diagnosis.",
   },
   {
     step: "03",
@@ -96,7 +96,7 @@ const howItWorks = [
 const faqs = [
   {
     q: "What is the inspection fee?",
-    a: "The inspection fee (₹99 for mobile, ₹399 for other services) is paid upfront. It covers the cost of the technician traveling to your location and diagnosing the issue. The actual repair cost is quoted separately after diagnosis.",
+    a: "Mobile repair inspection is completely FREE — no upfront charge. For other services (AC, washing machine, refrigerator, TV, laptop), a ₹399 inspection fee is charged upfront to cover the technician's visit and diagnosis. The actual repair cost is quoted separately.",
   },
   {
     q: "What if I'm not satisfied with the diagnosis?",
@@ -208,7 +208,7 @@ export function LandingPage({ categories = [] }: { categories?: ServiceCategory[
               Fix anything at home
               <br />
               <span className="text-transparent bg-clip-text animated-gradient">
-                starting at ₹99
+                Mobile inspection FREE
               </span>
             </motion.h1>
 
@@ -219,7 +219,9 @@ export function LandingPage({ categories = [] }: { categories?: ServiceCategory[
               className="text-xl text-[var(--muted-foreground)] max-w-2xl mx-auto mb-10"
             >
               Book a verified technician for your mobile, laptop, or home appliance.
-              Pay just ₹99 (Mobile) or ₹399 (Other) inspection fee. Get an honest quote. Pay only if you&apos;re satisfied.
+              <span className="block mt-2">
+                📱 <strong className="text-green-600 dark:text-green-400">Mobile repair inspection is FREE</strong> &middot; Other appliances: ₹399. Honest quote. Pay only if you&apos;re satisfied.
+              </span>
             </motion.p>
 
             {/* CTAs */}
