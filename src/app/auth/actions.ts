@@ -189,3 +189,28 @@ export async function logout() {
   revalidatePath('/', 'layout');
   redirect('/auth/login');
 }
+
+export async function sendPasswordResetEmail(formData: FormData) {
+  const email = formData.get('email') as string;
+
+  if (!email) {
+    return { error: 'Email is required.' };
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Note: the redirectTo parameter should point to the page where they update their password
+  // Depending on how PKCE is configured in Supabase, this may redirect to the root or the specified URL.
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/reset-password`,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: true };
+}

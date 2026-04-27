@@ -105,9 +105,16 @@ function LoginContent() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>
-              )}
+              <div className="flex justify-between items-center mt-1.5">
+                {errors.password ? (
+                  <p className="text-xs text-red-500">{errors.password.message}</p>
+                ) : (
+                  <span />
+                )}
+                <Link href="/auth/forgot-password" className="text-xs text-[var(--primary)] font-semibold hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <Button
