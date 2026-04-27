@@ -747,6 +747,18 @@ export default function AdminDashboard() {
                     <p className="font-medium">{selectedBooking.user?.name || "Unknown"}</p>
                   </div>
                   <div>
+                    <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Mobile Number</p>
+                    <p className="font-medium">
+                      {selectedBooking.user?.phone ? (
+                        <a href={`tel:${selectedBooking.user.phone}`} className="text-[var(--primary)] hover:underline">
+                          {selectedBooking.user.phone}
+                        </a>
+                      ) : (
+                        <span className="text-[var(--muted-foreground)]">Not provided</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
                     <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">City / Pincode</p>
                     <p className="font-medium">{selectedBooking.city} - {selectedBooking.pincode}</p>
                   </div>
@@ -779,15 +791,53 @@ export default function AdminDashboard() {
               </div>
 
               <div className="space-y-3">
-                <h3 className="text-sm font-bold border-b border-[var(--border)] pb-1">Technician</h3>
+                <h3 className="text-sm font-bold border-b border-[var(--border)] pb-1">Technician Details</h3>
                 {selectedBooking.technician ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-bold">
-                      {selectedBooking.technician.full_name.charAt(0)}
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-bold text-lg">
+                        {selectedBooking.technician.full_name.charAt(0)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm">{selectedBooking.technician.full_name}</p>
+                          {selectedBooking.technician.verified && (
+                            <span className="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold rounded-md">
+                              VERIFIED
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[var(--muted-foreground)]">{selectedBooking.technician.category} Expert</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-sm">{selectedBooking.technician.full_name}</p>
-                      <p className="text-xs text-[var(--muted-foreground)]">Assigned Expert</p>
+                    
+                    <div className="grid grid-cols-2 gap-3 text-sm bg-[var(--muted)]/50 p-3 rounded-xl border border-[var(--border)]">
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Mobile Number</p>
+                        <p className="font-medium">
+                          {selectedBooking.technician.phone ? (
+                            <a href={`tel:${selectedBooking.technician.phone}`} className="text-[var(--primary)] hover:underline">
+                              {selectedBooking.technician.phone}
+                            </a>
+                          ) : "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Rating</p>
+                        <p className="font-medium flex items-center gap-1">
+                          ⭐ {selectedBooking.technician.rating || "New"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">City</p>
+                        <p className="font-medium">{selectedBooking.technician.city}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Status</p>
+                        <p className="font-medium text-green-600">
+                          {selectedBooking.technician.active ? "Active" : "Inactive"}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ) : (

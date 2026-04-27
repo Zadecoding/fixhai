@@ -156,6 +156,12 @@ export async function createBooking(params: {
     return { error: 'Failed to save booking. Please contact support.' };
   }
 
+  // Update user profile with name and phone
+  await adminClient.from('users').update({
+    name: params.name,
+    phone: params.phone,
+  }).eq('id', user.id);
+
   // Record the payment transaction
   await adminClient.from('payments').insert({
     booking_id: booking.id,

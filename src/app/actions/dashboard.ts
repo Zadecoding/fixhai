@@ -146,7 +146,7 @@ export async function getAdminDashboardData() {
   const [bookingsResult, ticketsResult, usersResult] = await Promise.all([
     admin
       .from('bookings')
-      .select('*, user:users(name), technician:technician_profiles(full_name)')
+      .select('*, user:users(name, phone), technician:technician_profiles(*)')
       .order('created_at', { ascending: false }),
     admin
       .from('support_tickets')
