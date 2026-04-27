@@ -25,6 +25,7 @@ import type { BookingStatus } from "@/types/database";
 import { logout } from "@/app/auth/actions";
 import { AlertCircle, LogOut } from "lucide-react";
 import Link from "next/link";
+import { updateBookingStatusAction } from "./actions";
 
 const tabs = ["Active Jobs", "History", "Earnings"];
 
@@ -45,9 +46,15 @@ export default function TechnicianDashboardClient({
   const activeJobs = bookings.filter((b) => b.status !== "completed" && b.status !== "cancelled");
   const historyJobs = bookings.filter((b) => b.status === "completed" || b.status === "cancelled");
 
-  const updateStatus = (bookingId: string, status: BookingStatus) => {
-    setJobStatuses((prev) => ({ ...prev, [bookingId]: status }));
-    toast.success(`Status updated to: ${status.replace(/_/g, " ")}`);
+  const updateStatus = async (bookingId: string, status: BookingStatus) => {
+    setJobStatuses((prev) => ({ ...prev, [bookingId]: status })); // Optimistic update
+    
+    const res = await updateBookingStatusAction(bookingId, status);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success(`Status updated to: ${status.replace(/_/g, " ")}`);
+    }
   };
 
   return (
@@ -236,19 +243,25 @@ export default function TechnicianDashboardClient({
                       </div>
                       
                       <div className="flex gap-2">
-                        {currentStatus === 'pending' ? (
-                          <>
-                            <Button size="sm" variant="primary" className="flex-1" onClick={() => updateStatus(booking.id, 'assigned' as any)}>
-                              Accept
-                            </Button>
-                            <Button size="sm" variant="outline" className="flex-1">Decline</Button>
-                          </>
-                        ) : (
-                          <Link href={`/technician/job/${booking.id}`} className="flex-1">
-                            <Button size="sm" variant="primary" className="w-full">
-                              Manage Job <ChevronRight className="w-4 h-4" />
-                            </Button>
-                          </Link>
+                        {currentStatus === 'pending' && (
+                          <Button size="sm" variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={() => updateStatus(booking.id, 'assigned')}>
+                            Accept Job
+                          </Button>
+                        )}
+                        {currentStatus === 'assigned' && (
+                          <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 text-white" onClick={() => updateStatus(booking.id, 'on_the_way')}>
+                            I'm on my way
+                          </Button>
+                        )}
+                        {currentStatus === 'on_the_way' && (
+                          <Button size="sm" variant="primary" className="w-full bg-purple-600 hover:bg-purple-700 text-white" onClick={() => updateStatus(booking.id, 'diagnosis_complete')}>
+                            Confirmed Arrival
+                          </Button>
+                        )}
+                        {currentStatus === 'diagnosis_complete' && (
+                          <Button size="sm" variant="primary" className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(booking.id, 'completed')}>
+                            Mark Job as Completed
+                          </Button>
                         )}
                       </div>
                     </Card>
