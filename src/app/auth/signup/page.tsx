@@ -18,7 +18,6 @@ const signupSchema = z.object({
   email: z.string().email("Enter a valid email address"),
   phone: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["customer", "technician"]),
 });
 
 type SignupData = z.infer<typeof signupSchema>;
@@ -29,12 +28,9 @@ function SignupContent() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next");
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<SignupData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<SignupData>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { role: "customer" },
   });
-
-  const selectedRole = watch("role");
 
   const onSubmit = async (data: SignupData) => {
     setLoading(true);
@@ -43,7 +39,7 @@ function SignupContent() {
     formData.append("email", data.email);
     formData.append("password", data.password);
     formData.append("name", data.name);
-    formData.append("role", data.role);
+    formData.append("role", "customer");
     if (next) formData.append("next", next);
     
     const result = await signup(formData);
@@ -80,28 +76,6 @@ function SignupContent() {
         </div>
 
         <div className="bg-[var(--card)] rounded-3xl border border-[var(--border)] p-8 shadow-xl">
-          {/* Role selector */}
-          <div className="flex gap-3 mb-6">
-            {(["customer", "technician"] as const).map((role) => (
-              <label
-                key={role}
-                className={`flex-1 border-2 rounded-xl p-3 text-center text-sm font-semibold cursor-pointer transition-all ${
-                  selectedRole === role
-                    ? "border-[var(--primary)] bg-orange-50 dark:bg-orange-900/20 text-[var(--primary)]"
-                    : "border-[var(--border)] text-[var(--muted-foreground)]"
-                }`}
-              >
-                <input
-                  {...register("role")}
-                  type="radio"
-                  value={role}
-                  className="sr-only"
-                />
-                {role === "customer" ? "🙋 Customer" : "🔧 Technician"}
-              </label>
-            ))}
-          </div>
-
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {[
               { label: "Full Name", field: "name" as const, type: "text", placeholder: "Rahul Sharma" },
