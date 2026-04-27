@@ -21,7 +21,7 @@ import Link from "next/link";
 
 const timelineSteps: { status: BookingStatus; label: string; description: string }[] = [
   { status: "pending", label: "Booking Received", description: "Your booking and ₹99 fee received" },
-  { status: "assigned", label: "Technician Assigned", description: "A verified expert is on the case" },
+  { status: "assigned", label: "Booking Confirmed", description: "A verified technician has been assigned" },
   { status: "on_the_way", label: "Technician on the Way", description: "Expert is heading to your location" },
   { status: "diagnosis_complete", label: "Diagnosis Complete", description: "Issue identified, quote shared" },
   { status: "completed", label: "Job Completed", description: "Repair done successfully! 🎉" },
