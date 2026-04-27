@@ -50,7 +50,7 @@ export async function getAdminTechnicians() {
   const admin = getAdminClient();
   const { data: technicians, error } = await admin
     .from('technician_profiles')
-    .select('*')
+    .select('*, user:users(email)')
     .order('created_at', { ascending: false });
 
   if (error) {

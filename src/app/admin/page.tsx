@@ -412,6 +412,11 @@ export default function AdminDashboard() {
                         <div className="text-sm text-[var(--muted-foreground)]">
                           {tech.category} • {tech.city}, {tech.pincode} • {tech.phone}
                         </div>
+                        {tech.user?.email && (
+                          <div className="text-sm text-[var(--muted-foreground)] font-medium mt-0.5">
+                            {tech.user.email}
+                          </div>
+                        )}
                       </div>
 
                       {/* Action buttons */}
