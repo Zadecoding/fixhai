@@ -450,7 +450,8 @@ export default function AdminDashboard() {
                       <p className="text-xs text-[var(--muted-foreground)] mt-3 pl-16">{tech.bio}</p>
                     )}
                   </Card>
-                ))
+                  );
+                })
               )}
             </div>
           )}
