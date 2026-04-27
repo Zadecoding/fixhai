@@ -64,22 +64,32 @@ export async function checkAvailability(categorySlug: string, pincode: string) {
   }
 
   const allMatches = [...(exactMatch ?? []), ...arrayMatch];
-  const unique = Array.from(new Map(allMatches.map(t => [t.id, t])).values());
+  const uniqueMatches = Array.from(new Map(allMatches.map(t => [t.id, t])).values());
 
-  if (unique.length === 0) {
+  // Filter out technicians who are already busy with an active booking
+  const { data: activeBookings } = await adminClient
+    .from('bookings')
+    .select('technician_id')
+    .in('status', ['pending', 'assigned', 'on_the_way', 'diagnosis_complete'])
+    .not('technician_id', 'is', null);
+
+  const busyTechIds = new Set(activeBookings?.map(b => b.technician_id) || []);
+  const availableTechs = uniqueMatches.filter(t => !busyTechIds.has(t.id));
+
+  if (availableTechs.length === 0) {
     return {
       available: false,
       technicianCount: 0,
-      message: `No technicians are currently available in pincode ${pincode} for this service.`,
+      message: `No technicians are currently available in pincode ${pincode} for this service. They might be busy.`,
     };
   }
 
-  const sorted = unique.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const sorted = availableTechs.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
   const assignedTech = sorted[0];
 
   return {
     available: true,
-    technicianCount: unique.length,
+    technicianCount: availableTechs.length,
     technician_id: assignedTech.id,
     technician_name: assignedTech.full_name,
     technician_rating: assignedTech.rating,
@@ -149,7 +159,7 @@ export async function createBooking(params: {
     preferred_slot: params.preferredSlot,
     booking_fee: params.bookingFee,
     technician_id: params.technicianId || null,
-    status: 'pending',
+    status: params.technicianId ? 'assigned' : 'pending',
     payment_status: 'paid',
   }).select('id').single();
 
