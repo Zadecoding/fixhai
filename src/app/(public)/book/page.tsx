@@ -66,6 +66,7 @@ const steps = [
 export default function BookPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [confirmed, setConfirmed] = useState(false);
+  const [actualBookingId, setActualBookingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [userEmail, setUserEmail] = useState<string>('');
   const [availabilityStatus, setAvailabilityStatus] = useState<{
@@ -235,6 +236,9 @@ export default function BookPage() {
           toast.success('Booking confirmed! Technician will be assigned shortly.', {
             description: `Booking ID: ${bookingResult.bookingDbId?.slice(0, 8)} | No inspection fee for mobile repairs.`,
           });
+          if (bookingResult.bookingDbId) {
+            setActualBookingId(bookingResult.bookingDbId);
+          }
           setConfirmed(true);
         }
         setIsChecking(false);
@@ -286,6 +290,9 @@ export default function BookPage() {
             toast.success("Booking confirmed! Technician will be assigned shortly.", {
               description: `Booking ID: ${bookingResult.bookingDbId?.slice(0, 8)} | Payment ID: ${response.razorpay_payment_id}`,
             });
+            if (bookingResult.bookingDbId) {
+              setActualBookingId(bookingResult.bookingDbId);
+            }
           }
           setConfirmed(true);
         },
@@ -331,7 +338,7 @@ export default function BookPage() {
           <div className="bg-[var(--muted)] rounded-2xl p-4 mb-6 text-sm">
             <div className="flex justify-between mb-2">
               <span className="text-[var(--muted-foreground)]">Booking ID</span>
-              <span className="font-mono font-bold">{bookingId}</span>
+              <span className="font-mono font-bold">{actualBookingId ? actualBookingId.slice(0, 8).toUpperCase() : bookingId}</span>
             </div>
             <div className="flex justify-between mb-2">
               <span className="text-[var(--muted-foreground)]">Service</span>
@@ -347,7 +354,7 @@ export default function BookPage() {
             </div>
           </div>
           <div className="flex gap-3">
-            <a href={`/booking/${bookingId}`} className="flex-1">
+            <a href={`/booking/${actualBookingId || bookingId}`} className="flex-1">
               <Button size="lg" className="w-full" variant="primary">
                 Track Booking <ArrowRight className="w-4 h-4" />
               </Button>
