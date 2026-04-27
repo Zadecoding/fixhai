@@ -138,6 +138,8 @@ export async function createBooking(params: {
     user_id: user.id,
     category_id: category.id,
     service_name: category.name,
+    customer_name: params.name,
+    customer_phone: params.phone,
     issue_title: params.issueTitle,
     issue_description: params.issueDescription,
     address: params.address,

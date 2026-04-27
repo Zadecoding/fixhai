@@ -749,9 +749,9 @@ export default function AdminDashboard() {
                   <div>
                     <p className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] mb-0.5">Mobile Number</p>
                     <p className="font-medium">
-                      {selectedBooking.user?.phone ? (
-                        <a href={`tel:${selectedBooking.user.phone}`} className="text-[var(--primary)] hover:underline">
-                          {selectedBooking.user.phone}
+                      {selectedBooking.customer_phone || selectedBooking.user?.phone ? (
+                        <a href={`tel:${selectedBooking.customer_phone || selectedBooking.user?.phone}`} className="text-[var(--primary)] hover:underline">
+                          {selectedBooking.customer_phone || selectedBooking.user?.phone}
                         </a>
                       ) : (
                         <span className="text-[var(--muted-foreground)]">Not provided</span>

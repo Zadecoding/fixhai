@@ -93,6 +93,8 @@ export interface Database {
           category_id: string;
           issue_title: string;
           issue_description: string;
+          customer_name: string | null;
+          customer_phone: string | null;
           address: string;
           city: string;
           pincode: string;
